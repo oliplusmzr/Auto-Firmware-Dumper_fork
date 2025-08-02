@@ -82,6 +82,7 @@ jobs:
         run: |
           git config --global user.name "${{ env.UN }}"
           git config --global user.email "${{ env.UEM }}"
+          # GITHUB_TOKEN ortam değişkeni otomatik olarak kimlik doğrulaması yapacağı için gh auth login komutunu kullanmaya gerek yoktur.
           
       - name: Uploading ROM Dump
         run: |
@@ -94,8 +95,13 @@ jobs:
           fi
           
           # Move device trees to a temporary location for later use
-          mv lineage-device-tree /home/runner/work/
-          mv twrp-device-tree /home/runner/work/
+          if [ -d lineage-device-tree ]; then
+            mv lineage-device-tree /home/runner/work/
+          fi
+          
+          if [ -d twrp-device-tree ]; then
+            mv twrp-device-tree /home/runner/work/
+          fi
           
           # Extract metadata (brand, codename, version)
           if [ -d vendor ]; then
@@ -196,14 +202,18 @@ jobs:
           codename=$(cat codename.txt)
           brand=$(cat brand.txt)
           
-          cd lineage-device-tree
-          dat=$(date +%Y%m%d)
-          git init
-          git branch -M lineage-"$codename"-"$dat"
-          git add .
-          git commit -s -m "$codename : LineageOS compatible device tree"
-          gh repo create lineage_device_"$brand"_"$codename" --public --description="LineageOS compatible tree for $codename " --source=. --remote=origin --push
-          echo "LineageOS device tree uploaded successfully."
+          if [ -d lineage-device-tree ]; then
+            cd lineage-device-tree
+            dat=$(date +%Y%m%d)
+            git init
+            git branch -M lineage-"$codename"-"$dat"
+            git add .
+            git commit -s -m "$codename : LineageOS compatible device tree"
+            gh repo create lineage_device_"$brand"_"$codename" --public --description="LineageOS compatible tree for $codename " --source=. --remote=origin --push
+            echo "LineageOS device tree uploaded successfully."
+          else
+            echo "LineageOS device tree not found. Skipping upload."
+          fi
         continue-on-error: true
 
       - name: Uploading TWRP Device Tree
@@ -214,20 +224,24 @@ jobs:
           brand=$(cat brand.txt)
           version=$(cat version.txt)
           
-          cd twrp-device-tree
-          
-          # Handle the directory structure created by twrpdtgen
-          if [ -d "$brand/$codename" ]; then
-            cd "$brand/$codename"
+          if [ -d twrp-device-tree ]; then
+            cd twrp-device-tree
+            
+            # Handle the directory structure created by twrpdtgen
+            if [ -d "$brand/$codename" ]; then
+              cd "$brand/$codename"
+            fi
+            
+            dat=$(date +%Y%m%d)
+            git init
+            git branch -M twrp-"$version"-"$dat"
+            git add .
+            git commit -s -m "$codename : TWRP compatible device tree"
+            gh repo create twrp_device_"$brand"_"$codename" --public --description="TWRP compatible tree for $codename " --source=. --remote=origin --push
+            echo "TWRP device tree uploaded successfully."
+          else
+            echo "TWRP device tree not found. Skipping upload."
           fi
-          
-          dat=$(date +%Y%m%d)
-          git init
-          git branch -M twrp-"$version"-"$dat"
-          git add .
-          git commit -s -m "$codename : TWRP compatible device tree"
-          gh repo create twrp_device_"$brand"_"$codename" --public --description="TWRP compatible tree for $codename " --source=. --remote=origin --push
-          echo "TWRP device tree uploaded successfully."
         continue-on-error: true
         
       - name: Uploading Images as Artifacts
